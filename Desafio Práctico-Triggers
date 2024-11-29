@@ -1,0 +1,58 @@
+/*Eliminamos la base de datos con el nombre si es que existe alguna similar, luego la creamos para proceder a usarla*/
+DROP DATABASE IF EXISTS DB_LIBRARY;
+CREATE DATABASE DB_LIBRARY;
+USE DB_LIBRARY;
+
+/*Creamos la tabla Libros*/
+CREATE TABLE Libros (
+    ID INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(50),
+    autor VARCHAR(50),
+    precio DECIMAL(10,2)
+) ENGINE=INNODB; 
+
+/*Creamos la tabla Control para guardar los registros de las modificaciones que se hagan*/
+CREATE TABLE Control (
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    usuario VARCHAR(50),
+    libro_id INT,
+    precio_anterior DECIMAL(10,2),
+    nuevo_precio DECIMAL(10,2),
+    FOREIGN KEY (libro_id) REFERENCES Libros(ID)
+) ENGINE=INNODB;
+
+/*Creamos un procedimiento de almacenado para insertar datos en nuestra tabla Libros*/
+DELIMITER $$
+CREATE PROCEDURE InsertarLibros()
+BEGIN
+    INSERT INTO Libros (titulo, autor, precio) VALUES ('El Quijote', 'Miguel de Cervantes', 25.50);
+    INSERT INTO Libros (titulo, autor, precio) VALUES ('Cien Años de Soledad', 'Gabriel García Márquez', 30.00);
+    INSERT INTO Libros (titulo, autor, precio) VALUES ('1984', 'George Orwell', 20.99);
+    INSERT INTO Libros (titulo, autor, precio) VALUES ('Don Juan Tenorio', 'José Zorrilla', 18.75);
+    INSERT INTO Libros (titulo, autor, precio) VALUES ('La Odisea', 'Homero', 22.30);
+END$$
+DELIMITER ;
+/*Llamamos al procedimiento de almacenado y procedemos a ejecutar un Select para comprobar que la inserción funcionó correctamente*/
+CALL InsertarLibros();
+SELECT * FROM Libros;
+
+/*Aqui creamos el Disparador o Trigger que nos servirá para auditar cuando se haga la modificación*/
+DELIMITER $$
+CREATE TRIGGER auditoria_precio
+AFTER UPDATE ON Libros
+FOR EACH ROW
+BEGIN
+/*Hasta aqui si lo dejaramos sin el condicional, funcionaría correctamente pero se ejecutaría cada vez que haya una actualización en cualquier campo. Y no es lo que se quiere, por eso implementamos el condicional IF*/
+    IF OLD.precio <> NEW.precio THEN
+        INSERT INTO Control (usuario, libro_id, precio_anterior, nuevo_precio)
+        VALUES (USER(), NEW.ID, OLD.precio, NEW.precio);
+    END IF;
+END$$
+DELIMITER ;
+
+/*Cambiamos el precio de libro cuyo id sea igual a 1*/
+UPDATE Libros SET precio = 27.50 WHERE ID = 1; 
+/*Vemos de nuevo la tabla libros para ver la actualización*/
+SELECT * FROM Libros;
+/*Consultamos la tabla Control para comprobar la información necesaria*/
+SELECT * FROM Control;
